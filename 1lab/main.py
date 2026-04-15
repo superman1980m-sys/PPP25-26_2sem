@@ -20,10 +20,17 @@ class Pawn(Piece):
     def get_moves(self, board):
         moves = []
         x, y = self.position
-        direction = -1 if self.color == 'white' else 1
 
-        if board.is_empty((x + direction, y)):
-            moves.append((x + direction, y))
+        direction = 1 if self.color == 'white' else -1
+        start_row = 1 if self.color == 'white' else 6
+
+        one_step = (x + direction, y)
+        if board.in_bounds(one_step) and board.is_empty(one_step):
+            moves.append(one_step)
+
+            two_step = (x + 2 * direction, y)
+            if x == start_row and board.in_bounds(two_step) and board.is_empty(two_step):
+                moves.append(two_step)
 
         for dy in [-1, 1]:
             target = (x + direction, y + dy)
@@ -106,19 +113,19 @@ class King(Piece):
 
 class Board:
     UNICODE_PIECES = {
-        ('white', 'Pawn'): '♙',
-        ('white', 'Rook'): '♖',
-        ('white', 'Knight'): '♘',
-        ('white', 'Bishop'): '♗',
-        ('white', 'Queen'): '♕',
-        ('white', 'King'): '♔',
+        ('white', 'Pawn'): '♟',
+        ('white', 'Rook'): '♜',
+        ('white', 'Knight'): '♞',
+        ('white', 'Bishop'): '♝',
+        ('white', 'Queen'): '♛',
+        ('white', 'King'): '♚',
 
-        ('black', 'Pawn'): '♟',
-        ('black', 'Rook'): '♜',
-        ('black', 'Knight'): '♞',
-        ('black', 'Bishop'): '♝',
-        ('black', 'Queen'): '♛',
-        ('black', 'King'): '♚',
+        ('black', 'Pawn'): '♙',
+        ('black', 'Rook'): '♖',
+        ('black', 'Knight'): '♘',
+        ('black', 'Bishop'): '♗',
+        ('black', 'Queen'): '♕',
+        ('black', 'King'): '♔e',
     }
 
     def __init__(self):
@@ -146,35 +153,50 @@ class Board:
         self.set_piece(move.to_pos, piece)
         self.set_piece(move.from_pos, None)
 
+    def parse_pos(self, pos_str):
+        pos_str = pos_str.strip().lower()
+
+        if len(pos_str) != 2:
+            raise ValueError
+
+        col = ord(pos_str[0]) - ord('a')
+        row = int(pos_str[1]) - 1
+
+        if not self.in_bounds((row, col)):
+            raise ValueError
+
+        return (row, col)
+
     def setup(self):
         for i in range(8):
-            self.set_piece((1, i), Pawn('black', (1, i)))
-            self.set_piece((6, i), Pawn('white', (6, i)))
+            self.set_piece((1, i), Pawn('white', (1, i)))
+            self.set_piece((6, i), Pawn('black', (6, i)))
 
-        self.set_piece((0,0), Rook('black',(0,0)))
-        self.set_piece((0,7), Rook('black',(0,7)))
-        self.set_piece((7,0), Rook('white',(7,0)))
-        self.set_piece((7,7), Rook('white',(7,7)))
+        self.set_piece((0,0), Rook('white',(0,0)))
+        self.set_piece((0,7), Rook('white',(0,7)))
+        self.set_piece((7,0), Rook('black',(7,0)))
+        self.set_piece((7,7), Rook('black',(7,7)))
 
-        self.set_piece((0,1), Knight('black',(0,1)))
-        self.set_piece((0,6), Knight('black',(0,6)))
-        self.set_piece((7,1), Knight('white',(7,1)))
-        self.set_piece((7,6), Knight('white',(7,6)))
+        self.set_piece((0,1), Knight('white',(0,1)))
+        self.set_piece((0,6), Knight('white',(0,6)))
+        self.set_piece((7,1), Knight('black',(7,1)))
+        self.set_piece((7,6), Knight('black',(7,6)))
 
-        self.set_piece((0,2), Bishop('black',(0,2)))
-        self.set_piece((0,5), Bishop('black',(0,5)))
-        self.set_piece((7,2), Bishop('white',(7,2)))
-        self.set_piece((7,5), Bishop('white',(7,5)))
+        self.set_piece((0,2), Bishop('white',(0,2)))
+        self.set_piece((0,5), Bishop('white',(0,5)))
+        self.set_piece((7,2), Bishop('black',(7,2)))
+        self.set_piece((7,5), Bishop('black',(7,5)))
 
-        self.set_piece((0,3), Queen('black',(0,3)))
-        self.set_piece((7,3), Queen('white',(7,3)))
+        self.set_piece((0,3), Queen('white',(0,3)))
+        self.set_piece((7,3), Queen('black',(7,3)))
 
-        self.set_piece((0,4), King('black',(0,4)))
-        self.set_piece((7,4), King('white',(7,4)))
+        self.set_piece((0,4), King('white',(0,4)))
+        self.set_piece((7,4), King('black',(7,4)))
 
     def display(self):
-        print("  0 1 2 3 4 5 6 7")
-        for i, row in enumerate(self.grid):
+        print("  a b c d e f g h")
+        for i in range(7, -1, -1):
+            row = self.grid[i]
             line = []
             for cell in row:
                 if cell is None:
@@ -182,7 +204,7 @@ class Board:
                 else:
                     symbol = self.UNICODE_PIECES[(cell.color, cell.__class__.__name__)]
                     line.append(symbol)
-            print(f"{i} " + ' '.join(line))
+            print(f"{i+1} " + ' '.join(line))
         print()
 
 
@@ -198,8 +220,15 @@ class Game:
             print(f"Ход: {self.turn}")
 
             try:
-                x1, y1 = map(int, input("Откуда (x y): ").split())
-                x2, y2 = map(int, input("Куда (x y): ").split())
+                move_input = input("Ход: ").split()
+                if len(move_input) != 2:
+                    raise ValueError
+
+                from_str, to_str = move_input
+
+                x1, y1 = self.board.parse_pos(from_str)
+                x2, y2 = self.board.parse_pos(to_str)
+
             except:
                 print("Ошибка ввода")
                 continue
